@@ -4,7 +4,7 @@ use std::fs;
 use crate::starknet_commands::declare::BuildConfig;
 use crate::starknet_commands::{call, declare, deploy, invoke};
 use crate::{get_account, get_nonce, WaitForTx};
-use anyhow::{ensure, Context, Result};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use blockifier::execution::common_hints::ExecutionMode;
 use blockifier::execution::deprecated_syscalls::DeprecatedSyscallSelector;
 use blockifier::execution::entry_point::{
@@ -14,9 +14,14 @@ use blockifier::execution::execution_utils::ReadOnlySegments;
 use blockifier::execution::syscalls::hint_processor::SyscallHintProcessor;
 use blockifier::state::cached_state::CachedState;
 use cairo_felt::Felt252;
-use cairo_lang_casm::hints::Hint;
+use cairo_lang_casm::hints::{Hint, StarknetHint};
+use cairo_lang_casm::operand::{CellRef, ResOperand};
+use cairo_lang_runner::casm_run::{cell_ref_to_relocatable, execute_core_hint_base};
+use cairo_lang_runner::casm_run::{extract_relocatable, vm_get_range, MemBuffer};
 use cairo_lang_runner::short_string::as_cairo_short_string;
-use cairo_lang_runner::{build_hints_dict, RunResultValue, SierraCasmRunner};
+use cairo_lang_runner::{
+    build_hints_dict, insert_value_to_cellref, RunResultValue, SierraCasmRunner,
+};
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_lang_sierra_to_casm::metadata::MetadataComputationConfig;
 use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
@@ -43,8 +48,20 @@ use sncast::response::structs::ScriptResponse;
 use starknet::accounts::Account;
 use starknet::core::types::{BlockId, BlockTag::Pending, FieldElement};
 use starknet::providers::jsonrpc::HttpTransport;
-use starknet::providers::JsonRpcClient;
+use starknet::providers::{JsonRpcClient, ProviderError};
 use tokio::runtime::Runtime;
+
+enum ScriptCommandError {
+    RPCError(ProviderError),
+    SNCastError,
+}
+
+fn serialize_script_command_err(err: ScriptCommandError) -> Felt252 {
+    match err {
+        ScriptCommandError::RPCError(_) => Felt252::from(0),
+        ScriptCommandError::SNCastError => Felt252::from(1),
+    }
+}
 
 #[derive(Args)]
 #[command(about = "Execute a deployment script")]
@@ -84,17 +101,29 @@ impl<'a> ExtensionLogic for CastScriptExtension<'a> {
                     .map(|el| FieldElement::from_(el.clone()))
                     .collect();
 
-                let call_response = self.tokio_runtime.block_on(call::call(
+                match self.tokio_runtime.block_on(call::call(
                     contract_address,
                     &function_name,
                     calldata_felts,
                     self.provider,
                     &BlockId::Tag(Pending),
-                ))?;
+                )) {
+                    Ok(call_response) => {
+                        let mut res: Vec<Felt252> = vec![
+                            Felt252::from(0),
+                            Felt252::from(call_response.response.len()),
+                        ];
+                        res.extend(call_response.response.iter().map(|el| Felt252::from_(el.0)));
+                        Ok(CheatcodeHandlingResult::Handled(res))
+                    }
+                    Err(err) => {
+                        let error_msg_serialized =
+                            serialize_script_command_err(ScriptCommandError::SNCastError);
 
-                let mut res: Vec<Felt252> = vec![Felt252::from(call_response.response.len())];
-                res.extend(call_response.response.iter().map(|el| Felt252::from_(el.0)));
-                Ok(CheatcodeHandlingResult::Handled(res))
+                        let mut res: Vec<Felt252> = vec![Felt252::from(1), error_msg_serialized];
+                        Ok(CheatcodeHandlingResult::Handled(res))
+                    }
+                }
             }
             "declare" => {
                 let contract_name = reader
