@@ -231,26 +231,26 @@ fn test_invalid_secret_key() {
             #[test]
             #[should_panic(expected: ('invalid secret_key', ))]
             fn from_secret_key_stark() {
-                let key_pair = KeyPairTrait::<felt252, felt252>::from_secret_key(0);
+                let _key_pair = KeyPairTrait::<felt252, felt252>::from_secret_key(0);
             }
             
             #[test]
             #[should_panic(expected: ('invalid secret_key', ))]
             fn from_secret_key_secp256k1() {
-                let key_pair = KeyPairTrait::<u256, Secp256k1Point>::from_secret_key(0);
+                let _key_pair = KeyPairTrait::<u256, Secp256k1Point>::from_secret_key(0);
             }
             
             #[test]
             #[should_panic(expected: ('invalid secret_key', ))]
             fn from_secret_key_secp256r1() {
-                let key_pair = KeyPairTrait::<u256, Secp256r1Point>::from_secret_key(0);
+                let _key_pair = KeyPairTrait::<u256, Secp256r1Point>::from_secret_key(0);
             }
             
             #[test]
             #[should_panic(expected: ('invalid secret_key', ))]
             fn sign_stark() {
                 let key_pair = KeyPair { secret_key: 0, public_key: 0x321 } ;
-                let (r, s): (felt252, felt252) = key_pair.sign(123);
+                let (_r, _s): (felt252, felt252) = key_pair.sign(123);
             }
             
             #[test]
@@ -258,7 +258,7 @@ fn test_invalid_secret_key() {
             fn sign_secp256k1() {
                 let generator = Secp256k1Impl::get_generator_point();
                 let key_pair = KeyPair { secret_key: 0, public_key: generator } ;
-                let (r, s): (u256, u256) = key_pair.sign(123);
+                let (_r, _s): (u256, u256) = key_pair.sign(123);
             }
             
             #[test]
@@ -266,7 +266,7 @@ fn test_invalid_secret_key() {
             fn sign_secp256r1() {
                 let generator = Secp256r1Impl::get_generator_point();
                 let key_pair = KeyPair { secret_key: 0, public_key: generator } ;
-                let (r, s): (u256, u256) = key_pair.sign(123);
+                let (_r, _s): (u256, u256) = key_pair.sign(123);
             }
         "
     ));

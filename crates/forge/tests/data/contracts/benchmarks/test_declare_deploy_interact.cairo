@@ -30,5 +30,5 @@ fn declare_and_interact() {
     start_roll(CheatTarget::One(contract_address), 234);
     start_warp(CheatTarget::One(contract_address), 123);
 
-    let (x, y, z) = dispatcher.interact_with_state();
+    let (_x, _y, _z) = dispatcher.interact_with_state();
 }
