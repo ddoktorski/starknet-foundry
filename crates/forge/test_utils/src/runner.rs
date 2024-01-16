@@ -60,7 +60,7 @@ impl Contract {
                 sierra = true
 
                 [dependencies]
-                starknet = "2.4.0"
+                starknet = "2.4.3"
                 "#,
             ))
             .unwrap();
@@ -134,7 +134,7 @@ impl<'a> TestCase {
                 casm = true
 
                 [dependencies]
-                starknet = "2.4.0"
+                starknet = "2.4.3"
                 snforge_std = {{ path = "{}" }}
                 "#,
                 snforge_std_path

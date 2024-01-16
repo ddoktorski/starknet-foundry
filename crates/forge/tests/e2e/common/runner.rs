@@ -43,7 +43,7 @@ pub(crate) fn setup_package_with_file_patterns(
         .parse::<Document>()
         .unwrap();
     scarb_toml["dependencies"]["snforge_std"]["path"] = value(snforge_std_path);
-    scarb_toml["dependencies"]["starknet"] = value("2.4.0");
+    scarb_toml["dependencies"]["starknet"] = value("2.4.3");
     scarb_toml["target.starknet-contract"]["sierra"] = value(true);
 
     manifest_path.write_str(&scarb_toml.to_string()).unwrap();
@@ -83,7 +83,7 @@ pub(crate) fn setup_hello_workspace() -> TempDir {
 
                 
                 [workspace.dependencies]
-                starknet = "2.4.0"
+                starknet = "2.4.3"
                 snforge_std = {{ path = "{}" }}
                 
                 [workspace.package]
@@ -142,7 +142,7 @@ pub(crate) fn setup_virtual_workspace() -> TempDir {
                 [workspace.tool.snforge]
                 
                 [workspace.dependencies]
-                starknet = "2.4.0"
+                starknet = "2.4.3"
                 snforge_std = {{ path = "{}" }}
                 
                 [workspace.package]

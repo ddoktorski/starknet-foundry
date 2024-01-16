@@ -1,7 +1,5 @@
 [workspace]
-members = [
-    "dummy_name/*",
-]
+members = ["dummy_name/*"]
 
 [workspace.scripts]
 test = "snforge"
@@ -10,7 +8,7 @@ test = "snforge"
 exit_first = true
 
 [workspace.dependencies]
-starknet = "2.4.0"
+starknet = "2.4.3"
 snforge_std = { path = "../../../../../snforge_std" }
 
 [workspace.package]
