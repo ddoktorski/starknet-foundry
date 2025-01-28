@@ -26,6 +26,7 @@ use cheatnet::state::{
 };
 use entry_code::create_entry_code;
 use hints::{hints_by_representation, hints_to_params};
+use rand::prelude::StdRng;
 use runtime::starknet::context::{build_context, set_max_steps};
 use runtime::{ExtendedRuntime, StarknetRuntime};
 use starknet_types_core::felt::Felt;
@@ -33,7 +34,7 @@ use std::cell::RefCell;
 use std::default::Default;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use syscall_handler::build_syscall_handler;
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
@@ -66,6 +67,7 @@ pub fn run_test(
             &case,
             &casm_program,
             &RuntimeConfig::from(&test_runner_config),
+            None,
         );
 
         // TODO: code below is added to fix snforge tests
@@ -86,13 +88,13 @@ pub fn run_test(
 }
 
 pub(crate) fn run_fuzz_test(
-    args: Vec<Felt>,
     case: Arc<TestCaseWithResolvedConfig>,
     casm_program: Arc<AssembledProgramWithDebugInfo>,
     test_runner_config: Arc<TestRunnerConfig>,
     versioned_program_path: Arc<Utf8PathBuf>,
     send: Sender<()>,
     fuzzing_send: Sender<()>,
+    rng: Arc<Mutex<StdRng>>,
 ) -> JoinHandle<TestCaseSummary<Single>> {
     tokio::task::spawn_blocking(move || {
         // Due to the inability of spawn_blocking to be abruptly cancelled,
@@ -103,10 +105,11 @@ pub(crate) fn run_fuzz_test(
         }
 
         let run_result = run_test_case(
-            args.clone(),
+            vec![],
             &case,
             &casm_program,
             &Arc::new(RuntimeConfig::from(&test_runner_config)),
+            Some(rng),
         );
 
         // TODO: code below is added to fix snforge tests
@@ -119,7 +122,7 @@ pub(crate) fn run_fuzz_test(
         extract_test_case_summary(
             run_result,
             &case,
-            args,
+            vec![],
             &test_runner_config.contracts_data,
             &versioned_program_path,
         )
@@ -140,6 +143,7 @@ pub fn run_test_case(
     case: &TestCaseWithResolvedConfig,
     casm_program: &AssembledProgramWithDebugInfo,
     runtime_config: &RuntimeConfig,
+    fuzzer_rng: Option<Arc<Mutex<StdRng>>>,
 ) -> Result<RunResultWithInfo> {
     ensure!(
         case.config.available_gas != Some(0),
@@ -202,7 +206,7 @@ pub fn run_test_case(
     let forge_extension = ForgeExtension {
         environment_variables: runtime_config.environment_variables,
         contracts_data: runtime_config.contracts_data,
-        fuzzer_rng: None,
+        fuzzer_rng,
     };
 
     let mut forge_runtime = ExtendedRuntime {
