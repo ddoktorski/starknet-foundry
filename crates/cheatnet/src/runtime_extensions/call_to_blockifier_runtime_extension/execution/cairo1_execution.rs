@@ -1,10 +1,10 @@
-use crate::runtime_extensions::call_to_blockifier_runtime_extension::CheatnetState;
 use crate::runtime_extensions::call_to_blockifier_runtime_extension::execution::entry_point::{
     CallInfoWithExecutionData, ContractClassEntryPointExecutionResult,
     extract_trace_and_register_errors,
 };
 use crate::runtime_extensions::cheatable_starknet_runtime_extension::CheatableStarknetRuntimeExtension;
 use crate::runtime_extensions::common::get_relocated_vm_trace;
+use crate::state::CheatnetState;
 use blockifier::execution::contract_class::CompiledClassV1;
 use blockifier::execution::entry_point::ExecutableCallEntryPoint;
 use blockifier::execution::entry_point_execution::{

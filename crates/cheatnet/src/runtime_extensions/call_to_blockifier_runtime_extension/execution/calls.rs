@@ -1,4 +1,4 @@
-use crate::runtime_extensions::call_to_blockifier_runtime_extension::CheatnetState;
+use crate::state::CheatnetState;
 use blockifier::execution::call_info::CallInfo;
 use blockifier::execution::syscalls::hint_processor::ENTRYPOINT_FAILED_ERROR;
 use blockifier::{
@@ -13,6 +13,8 @@ use blockifier::{
     },
 };
 use cairo_vm::vm::vm_core::VirtualMachine;
+use conversions::IntoConv;
+use runtime::starknet::constants::TEST_ADDRESS;
 use starknet_api::{
     contract_class::EntryPointType,
     core::{ClassHash, EntryPointSelector},
@@ -32,13 +34,21 @@ pub fn execute_inner_call(
 ) -> SyscallResult<ReadOnlySegment> {
     let revert_idx = syscall_handler.base.context.revert_infos.0.len();
 
+    // TODO: This is a hacky logic and also returned errors are different now than before this change.
+    // We can probably workaround this with using a similar approach as in `execute_call` and `write_call_response`.
+    // https://github.com/foundry-rs/starknet-foundry/blob/995e7f8db85736727006e943e2ed673c7687ef98/crates/cheatnet/src/runtime_extensions/call_to_blockifier_runtime_extension/mod.rs#L155-L218
+    // But first we need to convert returned errors as in `from_execution_error`
+    // https://github.com/foundry-rs/starknet-foundry/blob/995e7f8db85736727006e943e2ed673c7687ef98/crates/cheatnet/src/runtime_extensions/call_to_blockifier_runtime_extension/rpc.rs#L61
+    let caller_felt: Felt = call.caller_address.into_();
+    let is_revertable = caller_felt != Felt::from_hex_unchecked(TEST_ADDRESS);
+
     // region: Modified blockifier code
     let call_info = execute_call_entry_point(
         call,
         syscall_handler.base.state,
         cheatnet_state,
         syscall_handler.base.context,
-        true,
+        is_revertable,
     )?;
     update_remaining_gas(remaining_gas, &call_info);
     // endregion

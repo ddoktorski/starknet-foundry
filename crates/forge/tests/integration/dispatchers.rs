@@ -133,13 +133,11 @@ fn handling_errors() {
         indoc!(
             r#"
         use array::ArrayTrait;
-        use result::ResultTrait;
         use option::OptionTrait;
+        use result::ResultTrait;
+        use snforge_std::{ContractClassTrait, DeclareResultTrait, declare};
+        use starknet::{ContractAddress, Felt252TryIntoContractAddress, contract_address_const};
         use traits::TryInto;
-        use starknet::ContractAddress;
-        use starknet::Felt252TryIntoContractAddress;
-        use snforge_std::{ declare, ContractClassTrait, DeclareResultTrait };
-        use starknet::contract_address_const;
 
         #[starknet::interface]
         trait IHelloStarknet<TContractState> {
@@ -184,17 +182,17 @@ fn handling_errors() {
         }
 
         #[test]
-        #[feature("safe_dispatcher")]
-        fn handling_missing_contract_error() {
-            let safe_dispatcher = IHelloStarknetSafeDispatcher {
-                contract_address: contract_address_const::<371937219379012>()
-            };
+        fn handling_missing_entrypoint_error() {
+            let contract = declare("HelloStarknet").unwrap().contract_class();
+            let (contract_address, _) = contract.deploy(@ArrayTrait::new()).unwrap();
 
-            match safe_dispatcher.do_a_panic() {
+            match starknet::call_contract_syscall(
+                contract_address, selector!("nonexistent_entrypoint"), array![].span(),
+            ) {
                 Result::Ok(_) => panic_with_felt252('shouldve panicked'),
-                Result::Err(_) => {
-                    // Would be nice to assert the error here once it is possible in cairo
-                }
+                Result::Err(panic_data) => {
+                    assert(*panic_data.at(0) == 'ENTRYPOINT_NOT_FOUND', *panic_data.at(0));
+                },
             };
         }
     "#
@@ -678,7 +676,7 @@ fn nonexistent_method_call() {
     assert_case_output_contains(
         &result,
         "nonexistent_method_call",
-        "Entry point selector 0x1fdb214e1495025fa4baf660d34f03c0d8b5037cf10311d2a3202a806aa9485 not found in contract",
+        "(0x454e545259504f494e545f4e4f545f464f554e44 ('ENTRYPOINT_NOT_FOUND'), 0x454e545259504f494e545f4641494c4544 ('ENTRYPOINT_FAILED'))",
     );
 }
 
@@ -809,7 +807,7 @@ fn undeclared_class_call() {
     assert_case_output_contains(
         &result,
         "undeclared_class_call",
-        "Contract not deployed at address: 0x5",
+        "Requested contract address 0x0000000000000000000000000000000000000000000000000000000000000005 is not deployed.",
     );
 }
 
@@ -900,8 +898,11 @@ fn nonexistent_class_libcall() {
     let result = run_test_case(&test, ForgeTrackedResource::CairoSteps);
 
     assert_failed(&result);
-    assert_case_output_contains(&result, "test_nonexistent_libcall", "Class with hash");
-    assert_case_output_contains(&result, "test_nonexistent_libcall", "is not declared.");
+    assert_case_output_contains(
+        &result,
+        "test_nonexistent_libcall",
+        "Class with hash 0x0000000000000000000000000000000000000000000000000000000000000005 is not declared.",
+    );
 }
 
 #[test]

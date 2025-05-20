@@ -4,11 +4,14 @@ use crate::gas::calculate_used_gas;
 use crate::package_tests::with_config_resolved::{ResolvedForkConfig, TestCaseWithResolvedConfig};
 use crate::test_case_summary::{Single, TestCaseSummary};
 use anyhow::{Result, bail};
-use blockifier::execution::call_info::CallInfo;
+use blockifier::execution::call_info::{CallInfo, Retdata};
 use blockifier::execution::contract_class::TrackedResource;
 use blockifier::execution::entry_point::EntryPointExecutionContext;
 use blockifier::execution::entry_point_execution::prepare_call_arguments;
 use blockifier::execution::errors::EntryPointExecutionError;
+use blockifier::execution::stack_trace::{
+    Cairo1RevertHeader, extract_trailing_cairo1_revert_trace,
+};
 use blockifier::state::cached_state::CachedState;
 use cairo_vm::Felt252;
 use cairo_vm::vm::errors::cairo_run_errors::CairoRunError;
@@ -16,7 +19,6 @@ use cairo_vm::vm::errors::vm_errors::VirtualMachineError;
 use camino::{Utf8Path, Utf8PathBuf};
 use cheatnet::constants as cheatnet_constants;
 use cheatnet::forking::state::ForkStateReader;
-use cheatnet::runtime_extensions::call_to_blockifier_runtime_extension::CallToBlockifierExtension;
 use cheatnet::runtime_extensions::call_to_blockifier_runtime_extension::rpc::UsedResources;
 use cheatnet::runtime_extensions::cheatable_starknet_runtime_extension::CheatableStarknetRuntimeExtension;
 use cheatnet::runtime_extensions::forge_runtime_extension::contracts_data::ContractsData;
@@ -35,7 +37,6 @@ use runtime::{ExtendedRuntime, StarknetRuntime};
 use starknet_api::execution_resources::GasVector;
 use std::cell::RefCell;
 use std::default::Default;
-use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Sender;
@@ -230,12 +231,6 @@ pub fn run_test_case(
         },
     };
 
-    let call_to_blockifier_runtime = ExtendedRuntime {
-        extension: CallToBlockifierExtension {
-            lifetime: &PhantomData,
-        },
-        extended_runtime: cheatable_runtime,
-    };
     let forge_extension = ForgeExtension {
         environment_variables: runtime_config.environment_variables,
         contracts_data: runtime_config.contracts_data,
@@ -244,19 +239,14 @@ pub fn run_test_case(
 
     let mut forge_runtime = ExtendedRuntime {
         extension: forge_extension,
-        extended_runtime: call_to_blockifier_runtime,
+        extended_runtime: cheatable_runtime,
     };
 
     let entry_point_initial_budget = setup::entry_point_initial_budget(
-        &forge_runtime
-            .extended_runtime
-            .extended_runtime
-            .extended_runtime
-            .hint_handler,
+        &forge_runtime.extended_runtime.extended_runtime.hint_handler,
     );
     let args = prepare_call_arguments(
         &forge_runtime
-            .extended_runtime
             .extended_runtime
             .extended_runtime
             .hint_handler
@@ -266,7 +256,6 @@ pub fn run_test_case(
         &mut runner,
         initial_syscall_ptr,
         &mut forge_runtime
-            .extended_runtime
             .extended_runtime
             .extended_runtime
             .hint_handler
@@ -288,17 +277,17 @@ pub fn run_test_case(
         program_segment_size,
     ) {
         Ok(()) => {
-            let call_info = finalize_execution(
+            let mut call_info = finalize_execution(
                 &mut runner,
-                &mut forge_runtime
-                    .extended_runtime
-                    .extended_runtime
-                    .extended_runtime
-                    .hint_handler,
+                &mut forge_runtime.extended_runtime.extended_runtime.hint_handler,
                 n_total_args,
                 program_extra_data_length,
                 tracked_resource,
             )?;
+
+            if call_info.execution.failed {
+                call_info.execution.retdata = extract_last_retdata(&call_info);
+            }
 
             // TODO(#3292) this can be done better, we can take gas directly from call info
             let vm_resources_without_inner_calls = runner
@@ -327,7 +316,6 @@ pub fn run_test_case(
 
     let encountered_errors = forge_runtime
         .extended_runtime
-        .extended_runtime
         .extension
         .cheatnet_state
         .encountered_errors
@@ -339,7 +327,6 @@ pub fn run_test_case(
     update_top_call_l1_resources(&mut forge_runtime);
 
     let fuzzer_args = forge_runtime
-        .extended_runtime
         .extended_runtime
         .extension
         .cheatnet_state
@@ -452,7 +439,6 @@ fn get_context<'a>(runtime: &'a ForgeRuntime) -> &'a EntryPointExecutionContext 
     runtime
         .extended_runtime
         .extended_runtime
-        .extended_runtime
         .hint_handler
         .base
         .context
@@ -461,10 +447,13 @@ fn get_context<'a>(runtime: &'a ForgeRuntime) -> &'a EntryPointExecutionContext 
 fn get_call_trace_ref(runtime: &mut ForgeRuntime) -> Rc<RefCell<CallTrace>> {
     runtime
         .extended_runtime
-        .extended_runtime
         .extension
         .cheatnet_state
         .trace_data
         .current_call_stack
         .top()
+}
+
+fn extract_last_retdata(call_info: &CallInfo) -> Retdata {
+    extract_trailing_cairo1_revert_trace(call_info, Cairo1RevertHeader::Execution).last_retdata
 }

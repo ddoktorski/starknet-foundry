@@ -1,12 +1,10 @@
 use self::contracts_data::ContractsData;
 use crate::runtime_extensions::call_to_blockifier_runtime_extension::rpc::UsedResources;
+use crate::runtime_extensions::cheatable_starknet_runtime_extension::CheatableStarknetRuntime;
 use crate::runtime_extensions::common::{get_syscalls_gas_consumed, sum_syscall_usage};
 use crate::runtime_extensions::forge_runtime_extension::cheatcodes::replace_bytecode::ReplaceBytecodeError;
 use crate::runtime_extensions::{
-    call_to_blockifier_runtime_extension::{
-        CallToBlockifierRuntime,
-        rpc::{CallFailure, CallResult},
-    },
+    call_to_blockifier_runtime_extension::rpc::{CallFailure, CallResult},
     cheatable_starknet_runtime_extension::SyscallSelector,
     common::get_relocated_vm_trace,
     forge_runtime_extension::cheatcodes::{
@@ -77,7 +75,7 @@ pub struct ForgeExtension<'a> {
 
 // This runtime extension provides an implementation logic for functions from snforge_std library.
 impl<'a> ExtensionLogic for ForgeExtension<'a> {
-    type Runtime = CallToBlockifierRuntime<'a>;
+    type Runtime = CheatableStarknetRuntime<'a>;
 
     #[expect(clippy::too_many_lines)]
     fn handle_cheatcode(
@@ -92,7 +90,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                 let execution_info = input_reader.read()?;
 
                 extended_runtime
-                    .extended_runtime
                     .extension
                     .cheatnet_state
                     .cheat_execution_info(execution_info);
@@ -106,11 +103,12 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
 
                 let ret_data: Vec<_> = input_reader.read()?;
 
-                extended_runtime
-                    .extended_runtime
-                    .extension
-                    .cheatnet_state
-                    .mock_call(contract_address, function_selector, &ret_data, span);
+                extended_runtime.extension.cheatnet_state.mock_call(
+                    contract_address,
+                    function_selector,
+                    &ret_data,
+                    span,
+                );
                 Ok(CheatcodeHandlingResult::from_serializable(()))
             }
             "stop_mock_call" => {
@@ -118,7 +116,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                 let function_selector = input_reader.read()?;
 
                 extended_runtime
-                    .extended_runtime
                     .extension
                     .cheatnet_state
                     .stop_mock_call(contract_address, function_selector);
@@ -129,7 +126,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                 let class = input_reader.read()?;
 
                 let is_undeclared = match extended_runtime
-                    .extended_runtime
                     .extended_runtime
                     .hint_handler
                     .base
@@ -143,7 +139,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
 
                 let res = if extended_runtime
                     .extended_runtime
-                    .extended_runtime
                     .hint_handler
                     .base
                     .state
@@ -155,7 +150,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                     Err(ReplaceBytecodeError::UndeclaredClassHash)
                 } else {
                     extended_runtime
-                        .extended_runtime
                         .extension
                         .cheatnet_state
                         .replace_class_for_contract(contract, class);
@@ -165,12 +159,7 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                 Ok(CheatcodeHandlingResult::from_serializable(res))
             }
             "declare" => {
-                let state = &mut extended_runtime
-                    .extended_runtime
-                    .extended_runtime
-                    .hint_handler
-                    .base
-                    .state;
+                let state = &mut extended_runtime.extended_runtime.hint_handler.base.state;
 
                 let contract_name: String = input_reader.read::<ByteArray>()?.to_string();
 
@@ -179,8 +168,7 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
             "deploy" => {
                 let class_hash = input_reader.read()?;
                 let calldata: Vec<_> = input_reader.read()?;
-                let cheatnet_runtime = &mut extended_runtime.extended_runtime;
-                let syscall_handler = &mut cheatnet_runtime.extended_runtime.hint_handler;
+                let syscall_handler = &mut extended_runtime.extended_runtime.hint_handler;
 
                 syscall_handler.increment_syscall_count_by(&DeprecatedSyscallSelector::Deploy, 1);
                 syscall_handler
@@ -188,7 +176,7 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
 
                 handle_declare_deploy_result(deploy(
                     syscall_handler,
-                    cheatnet_runtime.extension.cheatnet_state,
+                    extended_runtime.extension.cheatnet_state,
                     &class_hash,
                     &calldata,
                 ))
@@ -197,8 +185,7 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                 let class_hash = input_reader.read()?;
                 let calldata: Vec<_> = input_reader.read()?;
                 let contract_address = input_reader.read()?;
-                let cheatnet_runtime = &mut extended_runtime.extended_runtime;
-                let syscall_handler = &mut cheatnet_runtime.extended_runtime.hint_handler;
+                let syscall_handler = &mut extended_runtime.extended_runtime.hint_handler;
 
                 syscall_handler.increment_syscall_count_by(&DeprecatedSyscallSelector::Deploy, 1);
                 syscall_handler
@@ -206,7 +193,7 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
 
                 handle_declare_deploy_result(deploy_at(
                     syscall_handler,
-                    cheatnet_runtime.extension.cheatnet_state,
+                    extended_runtime.extension.cheatnet_state,
                     &class_hash,
                     &calldata,
                     contract_address,
@@ -217,7 +204,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                 let calldata: Vec<_> = input_reader.read()?;
 
                 let contract_address = extended_runtime
-                    .extended_runtime
                     .extension
                     .cheatnet_state
                     .precalculate_address(&class_hash, &calldata);
@@ -240,12 +226,7 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
             "get_class_hash" => {
                 let contract_address = input_reader.read()?;
 
-                let state = &mut extended_runtime
-                    .extended_runtime
-                    .extended_runtime
-                    .hint_handler
-                    .base
-                    .state;
+                let state = &mut extended_runtime.extended_runtime.hint_handler.base.state;
 
                 match get_class_hash(*state, contract_address) {
                     Ok(class_hash) => Ok(CheatcodeHandlingResult::from_serializable(class_hash)),
@@ -260,12 +241,10 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
 
                 let payload: Vec<_> = input_reader.read()?;
 
-                let cheatnet_runtime = &mut extended_runtime.extended_runtime;
-
-                let syscall_handler = &mut cheatnet_runtime.extended_runtime.hint_handler;
+                let syscall_handler = &mut extended_runtime.extended_runtime.hint_handler;
                 match l1_handler_execute(
                     syscall_handler,
-                    cheatnet_runtime.extension.cheatnet_state,
+                    extended_runtime.extension.cheatnet_state,
                     contract_address,
                     function_selector,
                     from_address,
@@ -296,7 +275,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
             }
             "spy_events" => {
                 let events_offset = extended_runtime
-                    .extended_runtime
                     .extension
                     .cheatnet_state
                     .detected_events
@@ -308,7 +286,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                 let events_offset = input_reader.read()?;
 
                 let events = extended_runtime
-                    .extended_runtime
                     .extension
                     .cheatnet_state
                     .get_events(events_offset);
@@ -317,7 +294,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
             }
             "spy_messages_to_l1" => {
                 let messages_offset = extended_runtime
-                    .extended_runtime
                     .extension
                     .cheatnet_state
                     .detected_messages_to_l1
@@ -329,7 +305,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                 let messages_offset = input_reader.read()?;
 
                 let messages = extended_runtime
-                    .extended_runtime
                     .extension
                     .cheatnet_state
                     .get_messages_to_l1(messages_offset);
@@ -455,7 +430,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
             }
             "get_call_trace" => {
                 let call_trace = &extended_runtime
-                    .extended_runtime
                     .extension
                     .cheatnet_state
                     .trace_data
@@ -465,12 +439,7 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                 Ok(CheatcodeHandlingResult::from_serializable(call_trace))
             }
             "store" => {
-                let state = &mut extended_runtime
-                    .extended_runtime
-                    .extended_runtime
-                    .hint_handler
-                    .base
-                    .state;
+                let state = &mut extended_runtime.extended_runtime.hint_handler.base.state;
                 let target = input_reader.read()?;
                 let storage_address = input_reader.read()?;
                 store(*state, target, storage_address, input_reader.read()?)
@@ -479,12 +448,7 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                 Ok(CheatcodeHandlingResult::from_serializable(()))
             }
             "load" => {
-                let state = &mut extended_runtime
-                    .extended_runtime
-                    .extended_runtime
-                    .hint_handler
-                    .base
-                    .state;
+                let state = &mut extended_runtime.extended_runtime.hint_handler.base.state;
                 let target = input_reader.read()?;
                 let storage_address = input_reader.read()?;
                 let loaded = load(*state, target, storage_address).context("Failed to load")?;
@@ -514,7 +478,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
             "save_fuzzer_arg" => {
                 let arg = input_reader.read::<ByteArray>()?.to_string();
                 extended_runtime
-                    .extended_runtime
                     .extension
                     .cheatnet_state
                     // Skip first character, which is a snapshot symbol '@'
@@ -527,7 +490,6 @@ impl<'a> ExtensionLogic for ForgeExtension<'a> {
                 let operation = input_reader.read()?;
 
                 extended_runtime
-                    .extended_runtime
                     .extension
                     .cheatnet_state
                     .cheat_block_hash(block_number, operation);
@@ -578,7 +540,6 @@ pub fn add_resources_to_top_call(
     let versioned_constants = runtime
         .extended_runtime
         .extended_runtime
-        .extended_runtime
         .hint_handler
         .base
         .context
@@ -586,7 +547,6 @@ pub fn add_resources_to_top_call(
         .block_context
         .versioned_constants();
     let top_call = runtime
-        .extended_runtime
         .extended_runtime
         .extension
         .cheatnet_state
@@ -607,7 +567,6 @@ pub fn update_top_call_resources(runtime: &mut ForgeRuntime) {
     // call representing the test code
     let top_call = runtime
         .extended_runtime
-        .extended_runtime
         .extension
         .cheatnet_state
         .trace_data
@@ -622,7 +581,6 @@ pub fn update_top_call_resources(runtime: &mut ForgeRuntime) {
     top_call.gas_consumed = all_sierra_gas_consumed;
 
     let top_call_syscalls = runtime
-        .extended_runtime
         .extended_runtime
         .extended_runtime
         .hint_handler
@@ -658,7 +616,6 @@ pub fn update_top_call_l1_resources(runtime: &mut ForgeRuntime) {
     let all_l2_l1_message_sizes = runtime
         .extended_runtime
         .extended_runtime
-        .extended_runtime
         .hint_handler
         .base
         .l2_to_l1_messages
@@ -669,7 +626,6 @@ pub fn update_top_call_l1_resources(runtime: &mut ForgeRuntime) {
     // call representing the test code
     let top_call = runtime
         .extended_runtime
-        .extended_runtime
         .extension
         .cheatnet_state
         .trace_data
@@ -679,12 +635,7 @@ pub fn update_top_call_l1_resources(runtime: &mut ForgeRuntime) {
 }
 
 pub fn update_top_call_vm_trace(runtime: &mut ForgeRuntime, cairo_runner: &mut CairoRunner) {
-    let trace_data = &mut runtime
-        .extended_runtime
-        .extended_runtime
-        .extension
-        .cheatnet_state
-        .trace_data;
+    let trace_data = &mut runtime.extended_runtime.extension.cheatnet_state.trace_data;
 
     if trace_data.is_vm_trace_needed {
         trace_data.current_call_stack.top().borrow_mut().vm_trace =
@@ -731,7 +682,7 @@ pub fn get_all_used_resources(
     transaction_context: &TransactionContext,
     tracked_resource: TrackedResource,
 ) -> UsedResources {
-    let starknet_runtime = runtime.extended_runtime.extended_runtime.extended_runtime;
+    let starknet_runtime = runtime.extended_runtime.extended_runtime;
     let top_call_l2_to_l1_messages = starknet_runtime.hint_handler.base.l2_to_l1_messages;
     let top_call_events = starknet_runtime.hint_handler.base.events;
 
@@ -760,7 +711,6 @@ pub fn get_all_used_resources(
 
     // call representing the test code
     let top_call = runtime
-        .extended_runtime
         .extended_runtime
         .extension
         .cheatnet_state

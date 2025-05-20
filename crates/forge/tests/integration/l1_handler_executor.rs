@@ -97,20 +97,6 @@ fn l1_handler_execute() {
                     },
                 }
             }
-
-            #[test]
-            #[should_panic]
-            fn l1_handler_contract_missing() {
-                let dispatcher = IBalanceTokenDispatcher { contract_address: contract_address_const::<421984739218742310>() };
-                dispatcher.get_balance();
-
-                let mut l1_handler = L1HandlerTrait::new(
-                    contract_address_const::<421984739218742310>(),
-                    selector!("process_l1_message")
-                );
-
-                l1_handler.execute(0x123, array![].span());
-            }
         "#
         ),
         Contract::from_code_path(

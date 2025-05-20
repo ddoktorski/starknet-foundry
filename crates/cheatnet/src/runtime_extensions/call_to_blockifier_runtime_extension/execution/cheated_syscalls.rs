@@ -1,7 +1,7 @@
 use super::calls::{execute_inner_call, execute_library_call};
 use super::execution_info::get_cheated_exec_info_ptr;
-use crate::runtime_extensions::call_to_blockifier_runtime_extension::CheatnetState;
 use crate::runtime_extensions::call_to_blockifier_runtime_extension::execution::entry_point::execute_constructor_entry_point;
+use crate::state::CheatnetState;
 use blockifier::execution::syscalls::hint_processor::{
     SyscallExecutionError, SyscallHintProcessor,
 };

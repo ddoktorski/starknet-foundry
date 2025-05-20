@@ -1,10 +1,10 @@
-use super::CheatnetState;
 use crate::runtime_extensions::{
     call_to_blockifier_runtime_extension::{
         execution::entry_point::execute_call_entry_point, panic_data::try_extract_panic_data,
     },
     common::create_execute_calldata,
 };
+use crate::state::CheatnetState;
 use blockifier::execution::entry_point::CallEntryPoint;
 use blockifier::execution::{
     call_info::CallInfo,
