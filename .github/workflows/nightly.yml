@@ -7,6 +7,10 @@ on:
         description: "Dry run"
         type: boolean
         default: true
+  # TESTING
+  push:
+    branches:
+      - 3300-nightly-release-workflow-fork
 
 concurrency:
   group: ${{ github.workflow }}
@@ -34,7 +38,8 @@ jobs:
         id: version
         shell: bash
         run: |
-          NIGHTLY_TAG="nightly-$(date -u +%Y-%m-%d)"
+          # TESTING
+          NIGHTLY_TAG="nightly-$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}"
           NIGHTLY_BRANCH="nightly/tmp/$NIGHTLY_TAG"
           
           CURR_VERSION=$(grep '^version' Cargo.toml | cut -d '"' -f2)
@@ -135,17 +140,19 @@ jobs:
           mv artifacts-dl/build-*/starknet-foundry-* artifacts/
           ls -lh artifacts/
 
+      # TESTING
       - name: Create GitHub release
         run: |
           gh release create \
             "${{ needs.prepare.outputs.nightly_tag }}" \
-            --repo foundry-rs/starknet-foundry-nightlies \
+            --repo ddoktorski/starknet-foundry-nightlies \
             --latest \
             --title "${{ needs.prepare.outputs.nightly_tag }}" \
             --notes-file NIGHTLY_RELEASE_NOTES.md
         env:
           GH_TOKEN: ${{ secrets.SNFOUNDRY_NIGHTLIES_CONTENTS_WRITE }}
 
+      # TESTING
       - name: Upload release assets
         run: |
           for file in \
@@ -170,7 +177,7 @@ jobs:
             gh release upload \
               "${{ needs.prepare.outputs.nightly_tag }}" \
               "$file" \
-              --repo foundry-rs/starknet-foundry-nightlies
+              --repo ddoktorski/starknet-foundry-nightlies
           done
         env:
           GH_TOKEN: ${{ secrets.SNFOUNDRY_NIGHTLIES_CONTENTS_WRITE }}
