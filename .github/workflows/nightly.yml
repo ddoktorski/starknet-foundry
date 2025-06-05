@@ -119,6 +119,8 @@ jobs:
     needs: [ prepare, build-binaries, test-binary ]
     # Do not run on dry_run
     if: ${{ !(inputs.dry_run) }}
+    env:
+      GH_TOKEN: ${{ secrets.SNFOUNDRY_NIGHTLIES_CONTENTS_WRITE }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -140,7 +142,6 @@ jobs:
           mv artifacts-dl/build-*/starknet-foundry-* artifacts/
           ls -lh artifacts/
 
-      # TESTING
       - name: Create GitHub release
         run: |
           gh release create \
@@ -149,16 +150,10 @@ jobs:
             --latest \
             --title "${{ needs.prepare.outputs.nightly_tag }}" \
             --notes-file NIGHTLY_RELEASE_NOTES.md
-        env:
-          GH_TOKEN: ${{ secrets.SNFOUNDRY_NIGHTLIES_CONTENTS_WRITE }}
 
-      # TESTING
-      - name: Upload release assets
+      - name: Upload built artifacts
         run: |
-          for file in \
-            ./artifacts/* \
-            "starknet-foundry-${{ needs.prepare.outputs.nightly_tag }}.zip#Starknet Foundry source code (zip)" \
-            "starknet-foundry-${{ needs.prepare.outputs.nightly_tag }}.tar.gz#Starknet Foundry source code (tar.gz)"
+          for file in ./artifacts/*
           do
             # We remove the version tag from the filename so it can
             # be easily accessed in asdf and installation scripts.
@@ -168,19 +163,27 @@ jobs:
             # becomes:
             # starknet-foundry-nightly-2025-05-22-aarch64-apple-darwin.tar.gz
 
-            if ! [[ $(grep "#" <<< $file) ]]; then
-              label=$(echo "$file" | sed -E "s/v[^+]*\+//" | sed -E "s|.*/||")
-              cp "$file" "$label"
-              file="$label"
-            fi
+            label=$(echo "$file" | sed -E "s/v[^+]*\+//" | sed -E "s|.*/||")
+            cp "$file" "$label"
+            file="$label"
 
             gh release upload \
               "${{ needs.prepare.outputs.nightly_tag }}" \
               "$file" \
               --repo ddoktorski/starknet-foundry-nightlies
           done
-        env:
-          GH_TOKEN: ${{ secrets.SNFOUNDRY_NIGHTLIES_CONTENTS_WRITE }}
+
+      - name: Upload source code archives
+        run: |
+          for file in \
+            "starknet-foundry-${{ needs.prepare.outputs.nightly_tag }}.zip#Starknet Foundry source code (zip)" \
+            "starknet-foundry-${{ needs.prepare.outputs.nightly_tag }}.tar.gz#Starknet Foundry source code (tar.gz)"
+          do
+            gh release upload \
+              "${{ needs.prepare.outputs.nightly_tag }}" \
+              "$file" \
+              --repo ddoktorski/starknet-foundry-nightlies
+          done
 
   cleanup:
     runs-on: ubuntu-latest
