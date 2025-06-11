@@ -26,6 +26,7 @@ pub use cheatcodes::message_to_l1::{
 pub use cheatcodes::storage::store;
 pub use cheatcodes::storage::load;
 pub use cheatcodes::storage::map_entry_address;
+pub use cheatcodes::storage::interact_with_state;
 
 pub use cheatcodes::erc20::set_balance;
 pub use cheatcodes::erc20::Token;
@@ -47,6 +48,8 @@ pub use cheatcodes::execution_info::caller_address::start_cheat_caller_address_g
 pub use cheatcodes::execution_info::caller_address::stop_cheat_caller_address;
 pub use cheatcodes::execution_info::caller_address::stop_cheat_caller_address_global;
 pub use cheatcodes::execution_info::caller_address::start_cheat_caller_address;
+pub use cheatcodes::execution_info::contract_address::start_cheat_contract_address_global;
+pub use cheatcodes::execution_info::contract_address::stop_cheat_contract_address_global;
 pub use cheatcodes::execution_info::block_number::cheat_block_number;
 pub use cheatcodes::execution_info::block_number::start_cheat_block_number_global;
 pub use cheatcodes::execution_info::block_number::stop_cheat_block_number;
