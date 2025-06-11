@@ -4,6 +4,7 @@ use snforge_std::cheatcodes::CheatSpan;
 use crate::cheatcode::execute_cheatcode_and_deserialize;
 
 pub mod caller_address;
+pub mod contract_address;
 pub mod block_number;
 pub mod block_timestamp;
 pub mod sequencer_address;
@@ -123,6 +124,7 @@ struct ExecutionInfoMock {
     block_info: BlockInfoMock,
     tx_info: TxInfoMock,
     caller_address: Operation<ContractAddress>,
+    contract_address: Operation<ContractAddress>,
 }
 
 impl ExecutionInfoMockImpl of Default<ExecutionInfoMock> {
@@ -133,6 +135,7 @@ impl ExecutionInfoMockImpl of Default<ExecutionInfoMock> {
             block_info: Default::default(),
             tx_info: Default::default(),
             caller_address: Operation::Retain,
+            contract_address: Operation::Retain,
         }
     }
 }

@@ -7,6 +7,7 @@ use blockifier::execution::syscalls::hint_processor::{
 };
 use blockifier::execution::syscalls::{
     DeployRequest, DeployResponse, GetBlockHashRequest, GetBlockHashResponse, LibraryCallRequest,
+    StorageReadRequest, StorageReadResponse, StorageWriteRequest, StorageWriteResponse,
     SyscallResponse, syscall_base::SyscallResult,
 };
 use blockifier::execution::{call_info::CallInfo, entry_point::ConstructorContext};
@@ -31,6 +32,8 @@ use blockifier::{
 };
 use cairo_vm::types::relocatable::Relocatable;
 use cairo_vm::vm::vm_core::VirtualMachine;
+use conversions::string::TryFromHexStr;
+use runtime::starknet::constants::TEST_ADDRESS;
 use starknet_api::core::calculate_contract_address;
 use starknet_api::{
     contract_class::EntryPointType,
@@ -243,6 +246,65 @@ pub fn get_block_hash_syscall(
     )?;
 
     Ok(GetBlockHashResponse { block_hash })
+}
+
+#[allow(clippy::needless_pass_by_value)]
+pub fn storage_read(
+    request: StorageReadRequest,
+    _vm: &mut VirtualMachine,
+    syscall_handler: &mut SyscallHintProcessor<'_>,
+    cheatnet_state: &mut CheatnetState,
+    _remaining_gas: &mut u64,
+) -> SyscallResult<StorageReadResponse> {
+    let contract_address = syscall_handler.storage_address();
+    let test_address = TryFromHexStr::try_from_hex_str(TEST_ADDRESS)?;
+
+    // Save the original storage_address
+    let original_storage_address = syscall_handler.base.call.storage_address;
+
+    if contract_address == test_address {
+        let cheated_data = cheatnet_state.get_cheated_data(contract_address);
+        if let Some(new_address) = cheated_data.contract_address {
+            syscall_handler.base.call.storage_address = new_address;
+        }
+    }
+
+    let value = syscall_handler.base.storage_read(request.address)?;
+
+    // Restore the original storage_address
+    syscall_handler.base.call.storage_address = original_storage_address;
+
+    Ok(StorageReadResponse { value })
+}
+
+#[allow(clippy::needless_pass_by_value)]
+pub fn storage_write(
+    request: StorageWriteRequest,
+    _vm: &mut VirtualMachine,
+    syscall_handler: &mut SyscallHintProcessor<'_>,
+    cheatnet_state: &mut CheatnetState,
+    _remaining_gas: &mut u64,
+) -> SyscallResult<StorageWriteResponse> {
+    let contract_address = syscall_handler.storage_address();
+    let test_address = TryFromHexStr::try_from_hex_str(TEST_ADDRESS).unwrap();
+
+    let original_storage_address = syscall_handler.base.call.storage_address;
+
+    if contract_address == test_address {
+        let cheated_data = cheatnet_state.get_cheated_data(contract_address);
+        if let Some(new_address) = cheated_data.contract_address {
+            syscall_handler.base.call.storage_address = new_address;
+        }
+    }
+
+    syscall_handler
+        .base
+        .storage_write(request.address, request.value)?;
+
+    // Restore the original storage_address
+    syscall_handler.base.call.storage_address = original_storage_address;
+
+    Ok(StorageWriteResponse {})
 }
 
 #[derive(Debug)]
