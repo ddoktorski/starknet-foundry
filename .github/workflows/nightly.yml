@@ -7,6 +7,9 @@ on:
         description: "Dry run"
         type: boolean
         default: true
+  push:
+    branches:
+      - nightly-swm-fork-test
 
 concurrency:
   group: ${{ github.workflow }}
@@ -34,7 +37,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          NIGHTLY_TAG="nightly-$(date -u +%Y-%m-%d)"
+          NIGHTLY_TAG="nightly-$(date -u --date='3 days ago' +%Y-%m-%d)"
           NIGHTLY_BRANCH="nightly/tmp/$NIGHTLY_TAG"
 
           CURR_VERSION=$(grep '^version' Cargo.toml | cut -d '"' -f2)
@@ -141,7 +144,7 @@ jobs:
         run: |
           gh release create \
             "${{ needs.prepare.outputs.nightly_tag }}" \
-            --repo foundry-rs/starknet-foundry-nightlies \
+            --repo software-mansion-labs/starknet-foundry-nightlies \
             --latest \
             --title "${{ needs.prepare.outputs.nightly_tag }}" \
             --notes-file NIGHTLY_RELEASE_NOTES.md
@@ -165,7 +168,7 @@ jobs:
             gh release upload \
               "${{ needs.prepare.outputs.nightly_tag }}" \
               "$file" \
-              --repo foundry-rs/starknet-foundry-nightlies
+              --repo software-mansion-labs/starknet-foundry-nightlies
           done
 
       - name: Upload source code archives
@@ -177,7 +180,7 @@ jobs:
             gh release upload \
               "${{ needs.prepare.outputs.nightly_tag }}" \
               "$file" \
-              --repo foundry-rs/starknet-foundry-nightlies
+              --repo software-mansion-labs/starknet-foundry-nightlies
           done
 
   cleanup:
