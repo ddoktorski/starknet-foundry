@@ -1251,3 +1251,24 @@ fn dispatchers() {
         "},
     );
 }
+
+#[test]
+fn test_interact_with_state() {
+    let temp = setup_package("contract_state");
+    let output = test_runner(&temp).assert().code(0);
+
+    assert_stdout_contains(
+        output,
+        indoc! {r"
+    [..]Compiling[..]
+    [..]Finished[..]
+
+    Collected 2 test(s) from contract_state package
+    Running 0 test(s) from src/
+    Running 2 test(s) from tests/
+    [PASS] contract_state_integrationtest::test_contract::test_interact_with_state_return [..]
+    [PASS] contract_state_integrationtest::test_contract::test_interact_with_state [..]
+    Tests: 2 passed, 0 failed, 0 skipped, 0 ignored, 0 filtered out
+    "},
+    );
+}
